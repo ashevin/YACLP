@@ -289,7 +289,7 @@ public func parse<C: Collection>(_ arguments: C,
     func value(arg: String, for opt: Parameter) throws -> Any? {
         func checkedValue(_ arg: String, for opt: Parameter, as type: ValueType) throws -> Any {
             let invalidValue = E.invalidValue(opt, arg, commandPath)
-            let invalidValueType = E.invalidValue(opt, arg, commandPath)
+            let invalidValueType = E.invalidValueType(opt, arg, commandPath)
 
             switch type {
             case .string:
