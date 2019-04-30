@@ -238,6 +238,59 @@ final class YACLPTests: XCTestCase {
         }
     }
 
+    func test_remainder() {
+        let args = [
+            "greet",
+            "mister",
+            ]
+
+        do {
+            class Parameters {
+                var name: String?
+                var surname: String?
+            }
+
+            let parameters = Parameters()
+
+            let root = Command("yaclp", bindTarget: parameters)
+                .command(Commands.greet)
+
+            let result = try parse(args, root: root)
+
+            XCTAssertEqual(result.remainder[0], "mister")
+        }
+        catch {
+            XCTFail(String(describing: error))
+        }
+    }
+
+    func test_remainder_separator() {
+        let args = [
+            "greet",
+            "--",
+            "mister",
+            ]
+
+        do {
+            class Parameters {
+                var name: String?
+                var surname: String?
+            }
+
+            let parameters = Parameters()
+
+            let root = Command("yaclp", bindTarget: parameters)
+                .command(Commands.greet)
+
+            let result = try parse(args, root: root)
+
+            XCTAssertEqual(result.remainder[0], "mister")
+        }
+        catch {
+            XCTFail(String(describing: error))
+        }
+    }
+
     func test_unknown_option() {
         let args = [
             "-int", "11",
@@ -406,6 +459,8 @@ final class YACLPTests: XCTestCase {
         ("test_required_parameter",         test_required_parameter),
         ("test_optional_parameter",         test_optional_parameter),
         ("test_missing_optional_parameter", test_missing_optional_parameter),
+        ("test_remainder",                  test_remainder),
+        ("test_remainder_separator",        test_remainder_separator),
         ("test_unknown_option",             test_unknown_option),
         ("test_ambiguous_option",           test_ambiguous_option),
         ("test_missing_value",              test_missing_value),
