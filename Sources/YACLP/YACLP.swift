@@ -94,13 +94,18 @@ private extension ValueType {
     }
 }
 
+public protocol Component {}
+extension Command: Component {}
+extension Parameter: Component {}
+
+@_functionBuilder
 public final class Command {
     fileprivate typealias AddClosure = (inout [Any], String) -> ()
 
     public let token: String
 
     fileprivate let description: String
-    fileprivate let bindTarget: AnyObject?
+    fileprivate var bindTarget: AnyObject?
     fileprivate var subcommands = [Command]()
     fileprivate var arguments = [Parameter]()
     fileprivate var optionals = [Parameter]()
@@ -108,23 +113,86 @@ public final class Command {
 
     fileprivate let addToPath: AddClosure?
 
-    public init(_ appName: String = CommandLine.arguments[0],
-                description: String = "",
-                bindTarget: AnyObject? = nil) {
-        self.token = appName
-        self.description = description
-        self.bindTarget = bindTarget
-        self.addToPath = nil
-    }
-
     fileprivate init(token: String,
                      addToPath: @escaping AddClosure,
                      description: String = "",
-                     bindTarget: AnyObject? = nil) {
+                     bindTarget: AnyObject? = nil,
+                     components: [Component]) {
         self.token = token
         self.description = description
         self.bindTarget = bindTarget
         self.addToPath = addToPath
+
+        assignComponents(components)
+    }
+
+    fileprivate func assignComponents(_ components: [Component]) {
+        subcommands = components.compactMap({ $0 as? Command })
+        arguments = components.compactMap({ $0 as? Required })
+        optionals = components.compactMap({ $0 as? Optional })
+        options = components.compactMap({ $0 as? Tagged })
+
+        subcommands.forEach({ $0.bindTarget = $0.bindTarget ?? bindTarget })
+
+        precondition((arguments.isEmpty && optionals.isEmpty) || subcommands.isEmpty,
+                     "A node must define either untagged parameters or commands, but not both")
+    }
+
+    static func buildBlock(_ parameters: Component...) -> [Component] {
+        parameters
+    }
+}
+
+public extension Command {
+    convenience init(_ appName: String = CommandLine.arguments[0],
+                     description: String = "",
+                     bindTarget: AnyObject? = nil,
+                     @Command components: () -> [Component] = { [] }) {
+        self.init(token: appName,
+                  addToPath: { _, _ in },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: components())
+    }
+
+    convenience init(_ appName: String = CommandLine.arguments[0],
+                     description: String = "",
+                     bindTarget: AnyObject? = nil,
+                     @Command _ component: () -> Component)
+    {
+        self.init(token: appName,
+                  addToPath: { _, _ in },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: [component()])
+    }
+
+    convenience init<Token>(_ command: Token,
+                            bindTarget: AnyObject? = nil,
+                            description: String = "",
+                            @Command components: () -> [Component] = { [] })
+        where Token: RawRepresentable, Token.RawValue == String
+    {
+        self.init(token: command.rawValue,
+                  addToPath: { $0.append(Token.init(rawValue: $1)!) },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: components())
+
+        assignComponents(components())
+    }
+
+    convenience init<Token>(_ command: Token,
+                            bindTarget: AnyObject? = nil,
+                            description: String = "",
+                            @Command component: () -> Component)
+        where Token: RawRepresentable, Token.RawValue == String
+    {
+        self.init(token: command.rawValue,
+                  addToPath: { $0.append(Token.init(rawValue: $1)!) },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: [component()])
     }
 }
 
@@ -137,16 +205,13 @@ public extension Command {
         where Token: RawRepresentable, Token.RawValue == String
     {
         precondition(arguments.isEmpty && optionals.isEmpty,
-                     "A node must define either parameters or commands, but not both")
-
-        let addToPath: AddClosure = {
-            $0.append(Token.init(rawValue: $1)!)
-        }
+                     "A node must define either untagged parameters or commands, but not both")
 
         let node = Command(token: command.rawValue,
-                           addToPath: addToPath,
+                           addToPath: { $0.append(Token.init(rawValue: $1)!) },
                            description: description,
-                           bindTarget: bindTarget ?? self.bindTarget)
+                           bindTarget: bindTarget ?? self.bindTarget,
+                           components: [])
 
         configure(node)
         subcommands.append(node)
@@ -158,18 +223,15 @@ public extension Command {
     func required<R, V>(_ parameter: String,
                         type: ValueType = .string,
                         binding: ReferenceWritableKeyPath<R, V>,
-                        description: String = "") -> Self {
+                        description: String = "") -> Self
+    {
         precondition(subcommands.isEmpty,
-                     "A node must define either parameters or commands, but not both")
+                     "A node must define either untagged parameters or commands, but not both")
         precondition(!type.isToggle, "untagged parameters cannot be toggled")
-        precondition(bindTarget != nil,
-                     "cannot add parameters to command without a bindTarget.")
 
-        let target = bindTarget as! R
-
-        arguments.append(Argument(parameter,
+        arguments.append(Required(parameter,
                                   type: type,
-                                  binding: { target[keyPath: binding] = $0 as! V },
+                                  binding: binding,
                                   description: description))
 
         return self
@@ -179,18 +241,15 @@ public extension Command {
     func optional<R, V>(_ parameter: String,
                         type: ValueType = .string,
                         binding: ReferenceWritableKeyPath<R, V>,
-                        description: String = "") -> Self {
+                        description: String = "") -> Self
+    {
         precondition(subcommands.isEmpty,
-                     "A node must define either parameters or commands, but not both")
+                     "A node must define either untagged parameters or commands, but not both")
         precondition(!type.isToggle, "untagged parameters cannot be toggled")
-        precondition(bindTarget != nil,
-                     "cannot add parameters to command without a bindTarget.")
-
-        let target = bindTarget as! R
 
         optionals.append(Optional(parameter,
                                   type: type,
-                                  binding: { target[keyPath: binding] = $0 as! V },
+                                  binding: binding,
                                   description: description))
 
         return self
@@ -200,15 +259,11 @@ public extension Command {
     func tagged<R, V>(_ parameter: String,
                       type: ValueType = .string,
                       binding: ReferenceWritableKeyPath<R, V>,
-                      description: String = "") -> Self {
-        precondition(bindTarget != nil,
-                     "cannot add parameters to command without a bindTarget.")
-
-        let target = bindTarget as! R
-
-        options.append(Option(parameter,
+                      description: String = "") -> Self
+    {
+        options.append(Tagged(parameter,
                               type: type,
-                              binding: { target[keyPath: binding] = $0 as! V },
+                              binding: binding,
                               description: description))
 
         return self
@@ -220,31 +275,58 @@ public class Parameter {
 
     fileprivate let description: String
     fileprivate let type: ValueType
-    fileprivate let binding: ((Any) -> ())?
+    fileprivate let binding: ((AnyObject, Any) -> ())?
 
     fileprivate var usageToken: String { fatalError("override me") }
 
-    fileprivate init(_ token: String,
-                     type: ValueType,
-                     binding: ((Any) -> ())? = nil,
-                     description: String = "") {
+    public init<R, V>(_ token: String,
+                      type: ValueType = .string,
+                      binding: ReferenceWritableKeyPath<R, V>,
+                      description: String = "")
+    {
         self.token = token
         self.description = description
         self.type = type
-        self.binding = binding
+        self.binding = { ($0 as! R)[keyPath: binding] = $1 as! V }
     }
 }
 
-public final class Argument: Parameter {
+public final class Required: Parameter {
     override fileprivate var usageToken: String { return "<\(token)>" }
+
+    public override init<R, V>(_ parameter: String,
+                               type: ValueType = .string,
+                               binding: ReferenceWritableKeyPath<R, V>,
+                               description: String = "")
+    {
+        precondition(!type.isToggle, "untagged parameters cannot be toggled")
+
+        super.init(parameter,
+                   type: type,
+                   binding: binding,
+                   description: description)
+    }
 }
 
-public final class Option: Parameter {
+public final class Tagged: Parameter {
     override fileprivate var usageToken: String { return "-\(token)" }
 }
 
 public final class Optional: Parameter {
     override fileprivate var usageToken: String { return "[\(token)]" }
+
+    public override init<R, V>(_ parameter: String,
+                               type: ValueType = .string,
+                               binding: ReferenceWritableKeyPath<R, V>,
+                               description: String = "")
+    {
+        precondition(!type.isToggle, "untagged parameters cannot be toggled")
+
+        super.init(parameter,
+                   type: type,
+                   binding: binding,
+                   description: description)
+    }
 }
 
 public struct ParseResults {
@@ -386,13 +468,13 @@ public func parse<C: Collection>(_ arguments: C,
                 if match.type.isToggle {
                     let v = !arg.starts(with: "-" + optionNegation)
 
-                    if let binding = match.binding { binding(v) }
+                    match.binding?(node.bindTarget!, v)
                 }
                 else {
                     guard !arguments.isEmpty else { throw E.missingValue(match, commandPath) }
 
                     if let v = try value(arg: arguments.pop(), for: match) {
-                        match.binding?(v)
+                        match.binding?(node.bindTarget!, v)
                     }
                 }
             }
@@ -410,17 +492,17 @@ public func parse<C: Collection>(_ arguments: C,
             }
         }
 
-        for node in node.arguments + node.optionals {
+        for arg in node.arguments + node.optionals {
             if arguments.isEmpty {
-                guard node is Optional else {
-                    throw E.missingValue(node, commandPath)
+                guard arg is Optional else {
+                    throw E.missingValue(arg, commandPath)
                 }
 
                 break
             }
 
-            if let v = try value(arg: arguments.pop(), for: node) {
-                node.binding?(v)
+            if let v = try value(arg: arguments.pop(), for: arg) {
+                arg.binding?(node.bindTarget!, v)
             }
         }
 

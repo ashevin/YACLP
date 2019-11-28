@@ -34,15 +34,16 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command(bindTarget: parameters)
-                .tagged("string", type: .string,                        binding: \Parameters.string)
-                .tagged("int",    type: .int(1...10),                   binding: \Parameters.int)
-                .tagged("double", type: .double,                        binding: \Parameters.double)
-                .tagged("bool",   type: .bool,                          binding: \Parameters.bool)
-                .tagged("date",   type: .date(format: "yyyy"),          binding: \Parameters.date)
-                .tagged("array",  type: .array(.int(nil)),              binding: \Parameters.array)
-                .tagged("toggle", type: .toggle,                        binding: \Parameters.toggle)
-                .tagged("custom", type: .custom({ Custom(value: $0) }), binding: \Parameters.custom)
+            let root = Command(bindTarget: parameters) {
+                Tagged("string", type: .string,                        binding: \Parameters.string)
+                Tagged("int",    type: .int(1...10),                   binding: \Parameters.int)
+                Tagged("double", type: .double,                        binding: \Parameters.double)
+                Tagged("bool",   type: .bool,                          binding: \Parameters.bool)
+                Tagged("date",   type: .date(format: "yyyy"),          binding: \Parameters.date)
+                Tagged("array",  type: .array(.int(nil)),              binding: \Parameters.array)
+                Tagged("toggle", type: .toggle,                        binding: \Parameters.toggle)
+                Tagged("custom", type: .custom({ Custom(value: $0) }), binding: \Parameters.custom)
+            }
 
             _ = try parse(args, root: root)
 
@@ -68,8 +69,9 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command(bindTarget: parameters)
-                .tagged("string", type: .string, binding: \Parameters.string)
+            let root = Command(bindTarget: parameters) {
+                Tagged("string", type: .string, binding: \Parameters.string)
+            }
 
             _ = try parse(args, root: root)
 
@@ -88,8 +90,9 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .tagged("int", type: .int(1...10), binding: \Parameters.int)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Tagged("int", type: .int(1...10), binding: \Parameters.int)
+            }
 
             _ = try parse(args, root: root)
 
@@ -115,8 +118,9 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .tagged("toggle", type: .toggle, binding: \Parameters.toggle)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Tagged("toggle", type: .toggle, binding: \Parameters.toggle)
+            }
 
             _ = try parse(args, root: root)
 
@@ -135,8 +139,9 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .command(Commands.greet)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Command(Commands.greet)
+            }
 
             let result = try parse(args, root: root)
 
@@ -165,9 +170,10 @@ final class YACLPTests: XCTestCase {
 
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .command(Commands.greet) {
-                    $0.required("name", binding: \Parameters.name)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Command(Commands.greet) {
+                    Required("name", binding: \Parameters.name)
+                }
             }
 
             _ = try parse(args, root: root)
@@ -194,10 +200,11 @@ final class YACLPTests: XCTestCase {
 
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .command(Commands.greet) {
-                    $0.required("name", binding: \Parameters.name)
-                    $0.optional("surname", binding: \Parameters.surname)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Command(Commands.greet) {
+                    Required("name", binding: \Parameters.name)
+                    Optional("surname", binding: \Parameters.surname)
+                }
             }
 
             _ = try parse(args, root: root)
@@ -223,10 +230,11 @@ final class YACLPTests: XCTestCase {
 
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .command(Commands.greet) {
-                    $0.required("name", binding: \Parameters.name)
-                    $0.optional("surname", binding: \Parameters.surname)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Command(Commands.greet) {
+                    Required("name", binding: \Parameters.name)
+                    Optional("surname", binding: \Parameters.surname)
+                }
             }
 
             _ = try parse(args, root: root)
@@ -252,8 +260,9 @@ final class YACLPTests: XCTestCase {
 
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .command(Commands.greet)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Command(Commands.greet)
+            }
 
             let result = try parse(args, root: root)
 
@@ -279,8 +288,9 @@ final class YACLPTests: XCTestCase {
 
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .command(Commands.greet)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Command(Commands.greet)
+            }
 
             let result = try parse(args, root: root)
 
@@ -324,9 +334,10 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .tagged("integer", type: .int(nil), binding: \Parameters.int)
-                .tagged("integral", type: .int(nil), binding: \Parameters.int)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Tagged("integer", type: .int(nil), binding: \Parameters.int)
+                Tagged("integral", type: .int(nil), binding: \Parameters.int)
+            }
 
             _ = try parse(args, root: root)
 
@@ -352,8 +363,9 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .tagged("int", type: .int(nil), binding: \Parameters.int)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Tagged("int", type: .int(nil), binding: \Parameters.int)
+            }
 
             _ = try parse(args, root: root)
 
@@ -378,8 +390,9 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .tagged("int", type: .int(1...11), binding: \Parameters.int)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Tagged("int", type: .int(1...11), binding: \Parameters.int)
+            }
 
             _ = try parse(args, root: root)
 
@@ -405,8 +418,9 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .tagged("int", type: .int(nil), binding: \Parameters.int)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Tagged("int", type: .int(nil), binding: \Parameters.int)
+            }
 
             _ = try parse(args, root: root)
 
@@ -432,9 +446,11 @@ final class YACLPTests: XCTestCase {
         do {
             let parameters = Parameters()
 
-            let root = Command("yaclp", bindTarget: parameters)
-                .tagged("int", type: .int(nil), binding: \Parameters.int)
-                .command(Commands.greet)
+            let root = Command("yaclp", bindTarget: parameters) {
+                Tagged("int", type: .int(nil), binding: \Parameters.int)
+
+                Command(Commands.greet)
+            }
 
             _ = try parse(args, root: root)
 
