@@ -8,7 +8,7 @@ Before diving into the API, we need to explain two concepts.
 
 ### Bindings
 
-Bindings allow the results of parsing to be bound to properties of a class.  YACLP requires that all parameters be bound.  Each spec will have at least one bind target, and each parameter will have a binding to a property of a target.
+Bindings allow the results of parsing to be bound to properties of a class.  YACLP requires that all parameters be bound.  Each spec will have at least one bind target, and each parameter will have a binding to a property of its command's target. Sub-commands may inherit its parent's target.  (A bind target is unnecessary if no parameters are defined.)
 
 #### Bind Target
 
@@ -151,10 +151,15 @@ public init(_ appName: String = CommandLine.arguments[0],  // the default value 
 let parameters = Parameters()
 
 let root =
-    Command("silly-app",
-            description: "A silly little program",
-            bindTarget: parameters)
+    AppCommand("silly-app",
+               description: "A silly little program",
+               bindTarget: parameters)
 ```
+
+**Note:** the root should be an instance of `AppCommand`.
+
+**AppCommand vs Command**
+> The two types have an almost-identical API.  The difference between them lie in their constructors.  `AppCommand` takes a `String` for its first argument, which allows any arbitrary value to be passed.  `Command` requires an `enum` case, which allows for better type-safety when parsing the command-line.  The former is more lenient, as the token representing the root command is not used to determine user intent.
 
 By convention, parameters will be defined next.
 
@@ -269,7 +274,7 @@ class Parameters {
 
 let parameters = Parameters()
 
-let root = Command(bindTarget: parameters)
+let root = AppCommand(bindTarget: parameters)
     .tagged("string", type: .string,                        binding: \Parameters.string)
     .tagged("int",    type: .int(1...10),                   binding: \Parameters.int)
     .tagged("double", type: .double,                        binding: \Parameters.double)
@@ -425,3 +430,34 @@ enum YACLPError: Error {
     case missingSubcommand([Command])
 }
 ```
+
+## Function Builder Syntax
+
+Thanks to the new function builder feature of Swift 5.1, there is an alternative syntax available for creating specifications.
+
+**Examples:**
+
+```swift
+struct Custom { let value: String }
+
+class Parameters {
+    var string: String?
+    var int: Int?
+}
+
+enum Commands {
+    case file
+}
+
+let parameters = Parameters()
+
+let root = AppCommand(bindTarget: parameters) {
+    Tagged("int",    type: .int(1...10),                   binding: \Parameters.int)
+
+    Command(Commands.file) {
+        Tagged("string", type: .string,                    binding: \Parameters.string)
+    }
+}
+```
+
+Instead of chaining calls to the builder methods, we can simply create instances of the different parameter types and/or (sub)commands within the trailing closure of the constructor.

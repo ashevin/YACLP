@@ -15,7 +15,7 @@ public enum YACLPError: Error {
      - argument string
      - list of commands parsed
      */
-    case unknownOption(String, [Command])
+    case unknownOption(String, [_Command])
 
     /**
      Ambiguous tagged parameter found.
@@ -29,7 +29,7 @@ public enum YACLPError: Error {
      of `filename`), but the prefix must be unambiguous across all tagged
      parameters of the current command.
      */
-    case ambiguousOption(String, [Parameter], [Command])
+    case ambiguousOption(String, [Parameter], [_Command])
 
     /**
      A value for a parameter was expected, but not found.
@@ -38,7 +38,7 @@ public enum YACLPError: Error {
      - the parameter whose value is missing
      - list of commands parsed
      */
-    case missingValue(Parameter, [Command])
+    case missingValue(Parameter, [_Command])
 
     /**
      A value was successfully parsed, but is not valid.
@@ -50,7 +50,7 @@ public enum YACLPError: Error {
 
      This exception applies to invalid int ranges and unparsable dates.
      */
-    case invalidValue(Parameter, String, [Command])
+    case invalidValue(Parameter, String, [_Command])
 
     /**
      A value could not be converted to the expected type.
@@ -62,7 +62,7 @@ public enum YACLPError: Error {
 
      **Example:** "two" for an `.int` parameter
      */
-    case invalidValueType(Parameter, String, [Command])
+    case invalidValueType(Parameter, String, [_Command])
 
     /*
      A sub-command was expected, but none was found.
@@ -70,7 +70,7 @@ public enum YACLPError: Error {
      **associated values:**
      - list of commands parsed
      */
-    case missingSubcommand([Command])
+    case missingSubcommand([_Command])
 }
 private typealias E = YACLPError
 
@@ -99,7 +99,7 @@ extension Command: Component {}
 extension Parameter: Component {}
 
 @_functionBuilder
-public final class Command {
+public class _Command {
     fileprivate typealias AddClosure = (inout [Any], String) -> ()
 
     public let token: String
@@ -143,60 +143,7 @@ public final class Command {
     }
 }
 
-public extension Command {
-    convenience init(_ appName: String = CommandLine.arguments[0],
-                     description: String = "",
-                     bindTarget: AnyObject? = nil,
-                     @Command components: () -> [Component] = { [] }) {
-        self.init(token: appName,
-                  addToPath: { _, _ in },
-                  description: description,
-                  bindTarget: bindTarget,
-                  components: components())
-    }
-
-    convenience init(_ appName: String = CommandLine.arguments[0],
-                     description: String = "",
-                     bindTarget: AnyObject? = nil,
-                     @Command _ component: () -> Component)
-    {
-        self.init(token: appName,
-                  addToPath: { _, _ in },
-                  description: description,
-                  bindTarget: bindTarget,
-                  components: [component()])
-    }
-
-    convenience init<Token>(_ command: Token,
-                            bindTarget: AnyObject? = nil,
-                            description: String = "",
-                            @Command components: () -> [Component] = { [] })
-        where Token: RawRepresentable, Token.RawValue == String
-    {
-        self.init(token: command.rawValue,
-                  addToPath: { $0.append(Token.init(rawValue: $1)!) },
-                  description: description,
-                  bindTarget: bindTarget,
-                  components: components())
-
-        assignComponents(components())
-    }
-
-    convenience init<Token>(_ command: Token,
-                            bindTarget: AnyObject? = nil,
-                            description: String = "",
-                            @Command component: () -> Component)
-        where Token: RawRepresentable, Token.RawValue == String
-    {
-        self.init(token: command.rawValue,
-                  addToPath: { $0.append(Token.init(rawValue: $1)!) },
-                  description: description,
-                  bindTarget: bindTarget,
-                  components: [component()])
-    }
-}
-
-public extension Command {
+public extension _Command {
     @discardableResult
     func command<Token>(_ command: Token,
                         bindTarget: AnyObject? = nil,
@@ -267,6 +214,65 @@ public extension Command {
                               description: description))
 
         return self
+    }
+}
+
+public final class AppCommand: _Command {}
+
+public extension AppCommand {
+    convenience init(_ appName: String = CommandLine.arguments[0],
+                     description: String = "",
+                     bindTarget: AnyObject? = nil,
+                     @_Command components: () -> [Component] = { [] }) {
+        self.init(token: appName,
+                  addToPath: { _, _ in },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: components())
+    }
+
+    convenience init(_ appName: String = CommandLine.arguments[0],
+                     description: String = "",
+                     bindTarget: AnyObject? = nil,
+                     @_Command _ component: () -> Component)
+    {
+        self.init(token: appName,
+                  addToPath: { _, _ in },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: [component()])
+    }
+}
+
+public final class Command: _Command {}
+
+public extension Command {
+    convenience init<Token>(_ command: Token,
+                            bindTarget: AnyObject? = nil,
+                            description: String = "",
+                            @_Command components: () -> [Component] = { [] })
+        where Token: RawRepresentable, Token.RawValue == String
+    {
+        self.init(token: command.rawValue,
+                  addToPath: { $0.append(Token.init(rawValue: $1)!) },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: components())
+
+        assignComponents(components())
+    }
+
+    convenience init<Token>(_ command: Token,
+                            bindTarget: AnyObject? = nil,
+                            description: String = "",
+                            @_Command component: () -> Component)
+        where Token: RawRepresentable, Token.RawValue == String
+    {
+        self.init(token: command.rawValue,
+                  addToPath: { $0.append(Token.init(rawValue: $1)!) },
+                  description: description,
+                  bindTarget: bindTarget,
+                  components: [component()])
     }
 }
 
@@ -359,7 +365,7 @@ private func prepare<C: Collection>(_ args: C) -> ([String], C.SubSequence)
 }
 
 public func parse<C: Collection>(_ arguments: C,
-                                 root: Command,
+                                 root: _Command,
                                  optionNegation: String = "no")
     throws -> ParseResults where C.Element == String
 {
@@ -456,7 +462,7 @@ public func parse<C: Collection>(_ arguments: C,
         return matches.first
     }
 
-    func _parse(node: Command) throws {
+    func _parse(node: _Command) throws {
         var done = false
 
         while !arguments.isEmpty && !done {
