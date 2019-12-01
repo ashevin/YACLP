@@ -452,10 +452,10 @@ enum Commands {
 let parameters = Parameters()
 
 let root = AppCommand(bindTarget: parameters) {
-    Tagged("int",    type: .int(1...10),                   binding: \Parameters.int)
+    Tagged("int",    type: .int(1...10), binding: \Parameters.int)
 
     Command(Commands.file) {
-        Tagged("string", type: .string,                    binding: \Parameters.string)
+        Tagged("string", type: .string, binding: \Parameters.string)
     }
 }
 ```
