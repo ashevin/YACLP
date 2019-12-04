@@ -1,5 +1,5 @@
 import XCTest
-@testable import YACLP
+import YACLP
 
 struct Custom { let value: String }
 

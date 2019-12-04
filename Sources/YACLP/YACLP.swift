@@ -111,17 +111,21 @@ public class _Command {
     fileprivate var optionals = [Parameter]()
     fileprivate var options = [Parameter]()
 
+    fileprivate let handler: (() -> ())?
+
     fileprivate let addToPath: AddClosure?
 
     fileprivate init(token: String,
                      addToPath: @escaping AddClosure,
                      description: String = "",
                      bindTarget: AnyObject? = nil,
+                     handler: (() -> ())? = nil,
                      components: [Component]) {
         self.token = token
         self.description = description
         self.bindTarget = bindTarget
         self.addToPath = addToPath
+        self.handler = handler
 
         assignComponents(components)
     }
@@ -138,7 +142,7 @@ public class _Command {
                      "A node must define either untagged parameters or commands, but not both")
     }
 
-    static func buildBlock(_ parameters: Component...) -> [Component] {
+    public static func buildBlock(_ parameters: Component...) -> [Component] {
         parameters
     }
 }
@@ -223,23 +227,27 @@ public extension AppCommand {
     convenience init(_ appName: String = CommandLine.arguments[0],
                      description: String = "",
                      bindTarget: AnyObject? = nil,
+                     handler: (() -> ())? = nil,
                      @_Command components: () -> [Component] = { [] }) {
         self.init(token: appName,
                   addToPath: { _, _ in },
                   description: description,
                   bindTarget: bindTarget,
+                  handler: handler,
                   components: components())
     }
 
     convenience init(_ appName: String = CommandLine.arguments[0],
                      description: String = "",
                      bindTarget: AnyObject? = nil,
+                     handler: (() -> ())? = nil,
                      @_Command _ component: () -> Component)
     {
         self.init(token: appName,
                   addToPath: { _, _ in },
                   description: description,
                   bindTarget: bindTarget,
+                  handler: handler,
                   components: [component()])
     }
 }
@@ -249,6 +257,7 @@ public final class Command: _Command {}
 public extension Command {
     convenience init<Token>(_ command: Token,
                             bindTarget: AnyObject? = nil,
+                            handler: (() -> ())? = nil,
                             description: String = "",
                             @_Command components: () -> [Component] = { [] })
         where Token: RawRepresentable, Token.RawValue == String
@@ -257,6 +266,7 @@ public extension Command {
                   addToPath: { $0.append(Token.init(rawValue: $1)!) },
                   description: description,
                   bindTarget: bindTarget,
+                  handler: handler,
                   components: components())
 
         assignComponents(components())
@@ -264,6 +274,7 @@ public extension Command {
 
     convenience init<Token>(_ command: Token,
                             bindTarget: AnyObject? = nil,
+                            handler: (() -> ())? = nil,
                             description: String = "",
                             @_Command component: () -> Component)
         where Token: RawRepresentable, Token.RawValue == String
@@ -272,6 +283,7 @@ public extension Command {
                   addToPath: { $0.append(Token.init(rawValue: $1)!) },
                   description: description,
                   bindTarget: bindTarget,
+                  handler: handler,
                   components: [component()])
     }
 }
@@ -518,6 +530,8 @@ public func parse<C: Collection>(_ arguments: C,
     }
 
     try _parse(node: root)
+
+    commandPath.last?.handler?()
 
     return ParseResults(commands: commands,
                         remainder: arguments + remainder)
